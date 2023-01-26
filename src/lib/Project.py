@@ -1,5 +1,5 @@
 from .BuildConfig import BuildConfig
-from .Target import Target
+from .Target import Target, TargetType
 from .Config import config
 
 import logging
@@ -18,7 +18,13 @@ class Project:
 
     def add_executable(self, name: str, *, sources: list[str]):
         logging.info(f"New executable: {name}, compiled from {sources[:3]}...")
-        target = Target(self, name, sources=sources)
+        target = Target(self, TargetType.EXECUTABLE, name, sources=sources)
+        self._targets[name] = target
+        return target
+
+    def add_static_library(self, name: str, *, sources: list[str]):
+        logging.info(f"New static library: {name}, compiled from {sources[:3]}...")
+        target = Target(self, TargetType.STATIC_LIBRARY, name, sources=sources)
         self._targets[name] = target
         return target
 
