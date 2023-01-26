@@ -24,5 +24,4 @@ def main(*, build: bool, run: bool, run_target: str):
         root_project.build()
 
     if run:
-        print(os.getcwd())
         root_project.run(run_target)
