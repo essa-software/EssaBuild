@@ -1,9 +1,9 @@
-from .Project import Project
 from .Config import config
+from .Project import Project
 
 import os
 
-root_project: Project = None
+root_project: Project | None = None
 
 
 def project(name):
@@ -14,7 +14,7 @@ def project(name):
     return root_project
 
 
-def main(*, build: bool, run: bool, run_target: str):
+def main(*, build: bool, run: bool, run_target: str | None):
     global root_project
     if not root_project:
         raise Exception("No project was defined")

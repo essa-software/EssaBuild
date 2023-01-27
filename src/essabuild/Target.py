@@ -1,8 +1,12 @@
+from enum import IntEnum
+
 from .BuildConfig import BuildConfig
 from .Config import config
-from .Utils import sprun
+from .Utils import *
 
-from enum import IntEnum
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .Project import Project
 
 
 class TargetType(IntEnum):
@@ -53,7 +57,7 @@ class Target:
         # TODO: Topo sort, so that the target is built only once.
         self._linked_targets.append(target)
 
-    def build(self) -> list[str]:
+    def build(self):
         for src in self.sources:
             print(f"... building: {src}")
             sprun(f"""g++

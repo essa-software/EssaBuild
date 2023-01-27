@@ -1,6 +1,6 @@
 class BuildConfig:
     _parent = None
-    std: str = None
+    std: str | None = None
     defines: dict[str, str] = {}
     options: list[str] = []
 

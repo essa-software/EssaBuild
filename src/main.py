@@ -1,8 +1,9 @@
 import essabuild as eb
-import lib.BuildSystem as BuildSystem
+import essabuild.BuildSystem
 
 import os
 import sys
+
 
 def main():
     # TODO: Use argparse
@@ -12,7 +13,8 @@ def main():
     cwd = os.getcwd()
     command = sys.argv[1]
     eb.config.source_directory = cwd
-    eb.config.build_directory = os.path.join(eb.config.source_directory, "build")
+    eb.config.build_directory = os.path.join(
+        eb.config.source_directory, "build")
 
     do_build = command == "build" or command == "run"
     do_run = command == "run"
@@ -21,6 +23,8 @@ def main():
             print(f"Expected target name")
             return 1
         run_target = sys.argv[2]
+    else:
+        run_target = None
 
     filename = f"{eb.config.source_directory}/build.py"
 
@@ -37,10 +41,12 @@ def main():
         print(f"Failed to open build.py: {e}")
 
     try:
-        BuildSystem.main(build=do_build, run=do_run, run_target=run_target)
+        essabuild.BuildSystem.main(
+            build=do_build, run=do_run, run_target=run_target)
     except Exception as e:
         print(e)
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
