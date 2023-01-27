@@ -1,4 +1,5 @@
 from enum import IntEnum
+import os
 
 from .BuildConfig import BuildConfig
 from .Config import config
@@ -18,6 +19,7 @@ class Target:
     _project: 'Project'
     _name: str
     _linked_targets: list['Target']
+    _up_to_date: bool
     target_type: TargetType
     sources: list[str]
     compile_config: BuildConfig
@@ -32,10 +34,19 @@ class Target:
         self.compile_config = BuildConfig(project.compile_config)
         self.link_config = BuildConfig(project.link_config)
 
+        self._up_to_date = self._check_is_up_to_date()
+
     def __repr__(self):
         return f"{self.target_type.name} {self._name}"
+
+    def _check_is_up_to_date(self):
+        return self.get_source_mtime() < self.get_executable_mtime()
+
     def name(self) -> str:
         return self._name
+
+    def linked_targets(self):
+        return self._linked_targets
 
     def executable_path(self) -> str:
         match self.target_type:
@@ -59,7 +70,26 @@ class Target:
         # TODO: Topo sort, so that the target is built only once.
         self._linked_targets.append(target)
 
+    def get_source_mtime(self):
+        latest_source_time = 0
+        for source in self.sources:
+            latest_source_time = max(os.path.getmtime(config.source_file(source)), latest_source_time)
+        return latest_source_time
+
+    def get_executable_mtime(self):
+        return os.path.getmtime(self.executable_path())
+
+    def is_up_to_date_with_all_deps(self):
+        for dep in self._linked_targets:
+            if not dep._up_to_date:
+                return False
+        return self._up_to_date
+
     def build(self):
+        if self.is_up_to_date_with_all_deps():
+            print("... target is up to date")
+            return
+
         for src in self.sources:
             print(f"... building: {src}")
             sprun(f"""g++

@@ -21,7 +21,7 @@ class Project:
     def add_executable(self, name: str, *, sources: list[str]):
         logging.info(f"New executable: {name}, compiled from {sources[:3]}...")
         target = Target(self, TargetType.EXECUTABLE,
-                           name, sources=sources)
+                        name, sources=sources)
         self._targets[name] = target
         return target
 
@@ -29,7 +29,7 @@ class Project:
         logging.info(
             f"New static library: {name}, compiled from {sources[:3]}...")
         target = Target(self, TargetType.STATIC_LIBRARY,
-                           name, sources=sources)
+                        name, sources=sources)
         self._targets[name] = target
         return target
 
