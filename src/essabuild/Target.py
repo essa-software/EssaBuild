@@ -32,6 +32,8 @@ class Target:
         self.compile_config = BuildConfig(project.compile_config)
         self.link_config = BuildConfig(project.link_config)
 
+    def __repr__(self):
+        return f"{self.target_type.name} {self._name}"
     def name(self) -> str:
         return self._name
 
