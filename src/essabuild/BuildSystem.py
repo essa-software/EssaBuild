@@ -21,6 +21,7 @@ def main(*, build: bool, run: bool, run_target: str | None):
 
     if build:
         os.makedirs(config.build_directory, exist_ok=True)
+        os.makedirs(config.tmp_directory, exist_ok=True)
         root_project.build()
 
     if run:

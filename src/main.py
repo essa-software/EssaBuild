@@ -1,11 +1,15 @@
+import traceback
+import os
+import sys
+import logging
+
 import essabuild as eb
 import essabuild.BuildSystem
 
-import os
-import sys
-
 
 def main():
+    # logging.basicConfig(level=logging.DEBUG)
+
     # TODO: Use argparse
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} build | [run <target>]")
@@ -13,8 +17,10 @@ def main():
     cwd = os.getcwd()
     command = sys.argv[1]
     eb.config.source_directory = cwd
-    eb.config.build_directory = os.path.join(
-        eb.config.source_directory, "build")
+    eb.config.build_directory = os.path.join(eb.config.source_directory,
+                                             "build")
+    eb.config.tmp_directory = os.path.join(eb.config.build_directory,
+                                           ".eb_tmp")
 
     do_build = command == "build" or command == "run"
     do_run = command == "run"
@@ -30,6 +36,7 @@ def main():
 
     print(f"Source dir: {eb.config.source_directory}")
     print(f"Build dir:  {eb.config.build_directory}")
+    print(f"Tmp dir:  {eb.config.tmp_directory}")
     try:
         with open(filename) as f:
             sys.path.append(os.path.dirname(__file__))
@@ -41,10 +48,11 @@ def main():
         print(f"Failed to open build.py: {e}")
 
     try:
-        essabuild.BuildSystem.main(
-            build=do_build, run=do_run, run_target=run_target)
+        essabuild.BuildSystem.main(build=do_build,
+                                   run=do_run,
+                                   run_target=run_target)
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     return 0
 
 
