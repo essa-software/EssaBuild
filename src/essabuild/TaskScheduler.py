@@ -39,6 +39,9 @@ class TaskScheduler:
             all_dependencies_are_worked_on = True
             for dep in task.dependencies:
                 if not dep in self.currently_performed_tasks and not dep in self.done_tasks:
+                    if not dep in self.remaining_tasks:
+                        logging.warning("Dependency %s of %s is unfinished but is also not scheduled, skipping! This is a bug.", dep, task)
+                        continue
                     logging.debug(
                         "Skipping %s because of unfinished dependency %s.",
                         task, dep)
