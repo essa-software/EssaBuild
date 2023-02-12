@@ -1,4 +1,5 @@
 from enum import IntEnum
+import os
 
 from .BuildConfig import BuildConfig
 from .Config import config
@@ -20,7 +21,6 @@ class Target:
     _project: 'Project'
     _name: str
     _linked_targets: list['Target']
-    _up_to_date: bool
     target_type: TargetType
     sources: list[Source]
     compile_config: BuildConfig
@@ -46,7 +46,7 @@ class Target:
             nonlocal self
             # FIXME: This is not abstract enough.
             linked_sources = ' '.join(
-                [config.build_file(f"{src.path()}.o") for src in self.sources if isinstance(src, CppCompiledSource)])
+                [src.object_file_path() for src in self.sources if isinstance(src, CppCompiledSource)])
             linked_targets = ' '.join([lib.get_link_option()
                                     for lib in self._linked_targets])
 
@@ -65,7 +65,7 @@ class Target:
                         {linked_targets}
                     """)
 
-        dependency_tasks = [dep._get_link_task() for dep in self._linked_targets]
+        dependency_tasks = [dep._get_link_task() for dep in self._linked_targets if not dep._is_linking_up_to_date()]
         self.link_task = Task(f"link {self._name}", link, cast(list[Task], [*self._get_source_tasks(), *dependency_tasks]))
         return self.link_task
 
@@ -73,6 +73,7 @@ class Target:
         self._project = project
         self._name = name
         self._linked_targets = []
+        self._linking_up_to_date = None
         self.target_type = target_type
         self.compile_config = BuildConfig(project.compile_config)
         self.link_config = BuildConfig(project.link_config)
@@ -109,8 +110,20 @@ class Target:
         _ = target.get_link_option()
         self._linked_targets.append(target)
 
+    def _is_linking_up_to_date(self):
+        if self._linking_up_to_date:
+            return self._linking_up_to_date
+
+        # linking is up to date if:
+        # 1. The executable actually exists
+        # 2. All sources are up-to-date
+        # 3. All dependencies (that are static libraries) have linking up-to-date.
+        return \
+            os.path.exists(self.executable_path()) and \
+            all([src.is_up_to_date() for src in self.sources]) and \
+            all([lib._is_linking_up_to_date() for lib in self._linked_targets]) 
+
     def get_tasks(self):
         # Note: It is important to store task objects, because they are compared
         #       to in dependency checks.
-        # TODO: Don't link if linking is up to date (how to check that???)
-        return [*self._get_source_tasks(), self._get_link_task()]
+        return [*self._get_source_tasks()] + ([] if self._is_linking_up_to_date() else [self._get_link_task()])
