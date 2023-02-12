@@ -56,6 +56,8 @@ class TaskScheduler:
             logging.warning(
                 f"No suitable task found but {len(self.remaining_tasks)} left to do!\
                     This is probably because of circular dependencies.")
+            for task in self.remaining_tasks:
+                print(task)
 
         return None
 
