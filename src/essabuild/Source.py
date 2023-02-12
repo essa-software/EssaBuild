@@ -1,5 +1,6 @@
 import abc
 import hashlib
+import os
 
 from .BuildConfig import BuildConfig
 from .Config import config
@@ -45,10 +46,13 @@ class CppCompiledSource(Source):
         self._path = path
         self.config = BuildConfig(target.compile_config)
 
+    def object_file_path(self):
+        return f"{config.build_file(self._path)}.o"
+
     def build(self):
         sprun(f"""g++
         -c {config.source_file(self._path)}
-        -o {config.build_file(self._path)}.o
+        -o {self.object_file_path()}
         {self.config.build_command_line()}
         """)
 
@@ -68,6 +72,12 @@ class CppCompiledSource(Source):
             return hashlib.md5(f.read()).hexdigest()
 
     def is_up_to_date(self):
+        # Source file is up to date if:
+        # 1. Object file exists
+        if not os.path.exists(self.object_file_path()):
+            return False
+
+        # 2. File hash didn't change since last build
         try:
             with open(self.hash_path()) as f:
                 old_hash = f.read()
