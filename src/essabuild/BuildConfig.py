@@ -1,26 +1,20 @@
 class BuildConfig:
-    _parent = None
-    std: str | None = None
-    defines: dict[str, str] = {}
-    options: list[str] = []
 
     def __init__(self, parent):
         self._parent = parent
+        self._options = list[str]()
+        if not parent:
+            self.set_std("gnu++20")
 
-    def get_std(self):
-        return self.std or (self._parent.get_std() if self._parent else "gnu++20")
+    def add_option(self, option: str):
+        self._options.append(option)
 
-    def get_defines(self):
-        return self.defines or (self._parent.get_defines() if self._parent else {})
+    def add_define(self, name: str, value: str):
+        self.add_option(f"-D{name}={value}")
 
-    def get_options(self):
-        return self.options or (self._parent.get_options() if self._parent else [])
-
-    def defines_command(self):
-        return " ".join([f"-D{v[0]}={v[1]}" for v in self.get_defines().items()])
-
-    def options_command(self):
-        return " ".join(self.get_options())
+    def set_std(self, std: str):
+        self.add_option(f"-std={std}")
 
     def build_command_line(self):
-        return f"-std={self.get_std()} {self.defines_command()} {self.options_command()}"
+        return (self._parent.build_command_line() + " " if self._parent else
+                "") + " ".join([v for v in self._options])
