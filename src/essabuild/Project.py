@@ -1,16 +1,15 @@
 import logging
 import subprocess as sp
 import traceback
-from typing import Union
+from typing import Callable, Union
 
 from .Source import Source
-from .Target import Target, TargetType
+from .Target import Target, CppTarget, CppTargetType, GeneratedTarget
 from .TaskScheduler import TaskScheduler
 from .BuildConfig import BuildConfig
 
 
 class Project:
-
     _name: str
     _targets = dict[str, Target]()
     compile_config = BuildConfig(None)
@@ -23,7 +22,10 @@ class Project:
     # Sources given as strings are assumed to be CppCompiledSources.
     def add_executable(self, name: str, *, sources: list[Union[str, Source]]):
         logging.info(f"New executable: {name}, compiled from {sources[:3]}...")
-        target = Target(self, TargetType.EXECUTABLE, name, sources=sources)
+        target = CppTarget(self,
+                           CppTargetType.EXECUTABLE,
+                           name,
+                           sources=sources)
         self._targets[name] = target
         return target
 
@@ -32,7 +34,19 @@ class Project:
                                                                    Source]]):
         logging.info(
             f"New static library: {name}, compiled from {sources[:3]}...")
-        target = Target(self, TargetType.STATIC_LIBRARY, name, sources=sources)
+        target = CppTarget(self,
+                           CppTargetType.STATIC_LIBRARY,
+                           name,
+                           sources=sources)
+        self._targets[name] = target
+        return target
+
+    def add_generated(self, name: str, *, generator: Callable[[list[str]],
+                                                              None],
+                      sources: list[str]):
+        logging.info(
+            f"New generated target: {name}, built from {sources[:3]}...")
+        target = GeneratedTarget(self, name, sources, generator)
         self._targets[name] = target
         return target
 
@@ -63,4 +77,4 @@ class Project:
         if not target:
             raise Exception(f"No target with name {target_name} found")
 
-        sp.run(target.executable_path())
+        target.run()

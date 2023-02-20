@@ -7,21 +7,45 @@ from .Source import Source, CppCompiledSource
 from .TaskScheduler import Task
 from .Utils import *
 
-from typing import TYPE_CHECKING, Union, cast
+import abc
+from typing import TYPE_CHECKING, Callable, Union, cast
 if TYPE_CHECKING:
     from .Project import Project
 
 
-class TargetType(IntEnum):
+class Target(abc.ABC):
+    def __init__(self, project: 'Project', name: str):
+        self._project = project
+        self._name = name
+        self._linked_targets = []
+
+    def name(self) -> str:
+        return self._name
+
+    def linked_targets(self):
+        return self._linked_targets
+
+    def link(self, target: 'Target'):
+        # TODO: Raise an exception early if linking is not allowed
+        self._linked_targets.append(target)
+
+    @abc.abstractmethod
+    def get_tasks(self) -> list[Task]:
+        return
+
+    @abc.abstractmethod
+    def is_linking_up_to_date(self) -> bool:
+        return
+
+    def run(self):
+        raise Exception(f"Target '{self.name}' is not runnable")
+
+class CppTargetType(IntEnum):
     EXECUTABLE = 1
     STATIC_LIBRARY = 2
 
-
-class Target:
-    _project: 'Project'
-    _name: str
-    _linked_targets: list['Target']
-    target_type: TargetType
+class CppTarget(Target):
+    target_type: CppTargetType
     sources: list[Source]
     compile_config: BuildConfig
     link_config: BuildConfig
@@ -48,31 +72,30 @@ class Target:
             linked_sources = ' '.join(
                 [src.object_file_path() for src in self.sources if isinstance(src, CppCompiledSource)])
             linked_targets = ' '.join([lib.get_link_option()
-                                    for lib in self._linked_targets])
+                                    for lib in self._linked_targets if isinstance(lib, CppTarget)])
 
             match self.target_type:
-                case TargetType.EXECUTABLE:
+                case CppTargetType.EXECUTABLE:
                     sprun(f"""g++
                         -o {self.executable_path()}
                         {linked_sources}
                         {linked_targets}
                         {self.link_config.build_command_line()}
                     """)
-                case TargetType.STATIC_LIBRARY:
+                case CppTargetType.STATIC_LIBRARY:
                     sprun(f"""ar -rcs
                         {self.executable_path()}
                         {linked_sources}
                         {linked_targets}
                     """)
+                    
 
-        dependency_tasks = [dep._get_link_task() for dep in self._linked_targets if not dep._is_linking_up_to_date()]
+        dependency_tasks = [dep._get_link_task() for dep in self._linked_targets if isinstance(dep, CppTarget) and not dep.is_linking_up_to_date()]
         self.link_task = Task(f"link {self._name}", link, cast(list[Task], [*self._get_source_tasks(), *dependency_tasks]))
         return self.link_task
 
-    def __init__(self, project: 'Project', target_type: TargetType, name: str, *, sources: list[Union[str, Source]]):
-        self._project = project
-        self._name = name
-        self._linked_targets = []
+    def __init__(self, project: 'Project', target_type: CppTargetType, name: str, *, sources: list[Union[str, Source]]):
+        super().__init__(project, name)
         self._linking_up_to_date = None
         self.target_type = target_type
         self.compile_config = BuildConfig(project.compile_config)
@@ -84,33 +107,22 @@ class Target:
     def __repr__(self):
         return f"{self.target_type.name} {self._name}"
 
-    def name(self) -> str:
-        return self._name
-
-    def linked_targets(self):
-        return self._linked_targets
-
     def executable_path(self) -> str:
         match self.target_type:
-            case TargetType.EXECUTABLE:
+            case CppTargetType.EXECUTABLE:
                 return config.build_file(self._name)
-            case TargetType.STATIC_LIBRARY:
+            case CppTargetType.STATIC_LIBRARY:
                 return f"{config.build_file(self._name)}.a"
 
     def get_link_option(self):
         match self.target_type:
-            case TargetType.EXECUTABLE:
+            case CppTargetType.EXECUTABLE:
                 raise Exception(
                     f"Cannot link to executable '{self.name()}'. Ensure that '{self.name()}' is a library")
-            case TargetType.STATIC_LIBRARY:
+            case CppTargetType.STATIC_LIBRARY:
                 return f"{self.executable_path()}"
 
-    def link(self, target: 'Target'):
-        # Raise an exception early if linking is not allowed
-        _ = target.get_link_option()
-        self._linked_targets.append(target)
-
-    def _is_linking_up_to_date(self):
+    def is_linking_up_to_date(self):
         if self._linking_up_to_date:
             return self._linking_up_to_date
 
@@ -121,9 +133,34 @@ class Target:
         return \
             os.path.exists(self.executable_path()) and \
             all([src.is_up_to_date() for src in self.sources]) and \
-            all([lib._is_linking_up_to_date() for lib in self._linked_targets]) 
+            all([lib.is_linking_up_to_date() for lib in self._linked_targets]) 
 
     def get_tasks(self):
         # Note: It is important to store task objects, because they are compared
         #       to in dependency checks.
-        return [*self._get_source_tasks()] + ([] if self._is_linking_up_to_date() else [self._get_link_task()])
+        return [*self._get_source_tasks()] + ([] if self.is_linking_up_to_date() else [self._get_link_task()])
+
+    def run(self):
+        if self.target_type != CppTargetType.EXECUTABLE:
+            raise Exception(f"Cannot run non-executable target {self.name()}")
+        sp.run(self.executable_path())
+
+class GeneratedTarget(Target):
+    def __init__(self, project: 'Project', name: str, sources: list[str], generator: Callable[[list[str]], None]):
+        super().__init__(project, name)
+        self._sources = sources
+        self._generator = generator
+
+        def generate():
+            nonlocal self, generator
+            # TODO: Up to date check
+            generator(self._sources)
+
+        self._generate_task = Task(f"generate: {sources}", generate, [])
+
+    def get_tasks(self):
+        return [self._generate_task]
+
+    def is_linking_up_to_date(self):
+        # TODO
+        return True
